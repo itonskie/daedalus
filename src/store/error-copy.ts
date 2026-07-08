@@ -19,6 +19,10 @@ export function errorToCopy(
 
 function llmErrorToCopy(err: LLMProviderError, ctx: ErrorCopyContext): string {
   if (err.kind === "shape") return "The model returned something that isn't code.";
+  if (err.kind === "cancelled") return "Generation cancelled.";
+  if (err.kind === "client-timeout") {
+    return "The model took too long — try again or use a smaller model.";
+  }
 
   if (err.providerId === "anthropic") {
     const status = err.status ?? 0;

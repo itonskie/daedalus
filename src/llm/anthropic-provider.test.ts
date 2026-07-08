@@ -113,4 +113,49 @@ describe("AnthropicProvider", () => {
     const body = JSON.parse(init.body as string);
     expect(body.model).toBe("claude-haiku-4-5");
   });
+
+  test("forwards the AbortSignal into fetch and rejects with kind: cancelled", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The user aborted a request.", "AbortError"));
+        });
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const p = new AnthropicProvider({ apiKey: "sk-ant-xxx", model: "claude-sonnet-4-6" });
+    const abort = new AbortController();
+    const promise = p.generateVoxelScript("a sphere", abort.signal);
+    await Promise.resolve();
+    abort.abort();
+    await expect(promise).rejects.toMatchObject({
+      providerId: "anthropic",
+      kind: "cancelled",
+    });
+  });
+
+  test("self-aborts after the client timeout and rejects with kind: client-timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The user aborted a request.", "AbortError"));
+          });
+        });
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const p = new AnthropicProvider({ apiKey: "sk-ant-xxx", model: "claude-sonnet-4-6" });
+      const promise = p.generateVoxelScript("a sphere");
+      // Avoid unhandled-rejection warnings while timers advance.
+      const caught = promise.catch((e) => e);
+      await vi.advanceTimersByTimeAsync(120_000);
+      const err = await caught;
+      expect(err).toMatchObject({ providerId: "anthropic", kind: "client-timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

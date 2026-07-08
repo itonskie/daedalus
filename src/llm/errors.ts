@@ -1,4 +1,6 @@
-export type LLMProviderErrorKind = "http" | "network" | "shape";
+export type LLMProviderErrorKind = "http" | "network" | "shape" | "cancelled" | "client-timeout";
+
+export const CLIENT_TIMEOUT_MS = 120_000;
 
 export type LLMProviderId = "anthropic" | "ollama";
 
