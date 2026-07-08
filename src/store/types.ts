@@ -1,8 +1,19 @@
+import type { LLMProvider, LLMProviderError } from "../llm";
 import type { ExecuteError } from "../sandbox";
 import type { GridReadback } from "../voxel";
 
 export type ProviderId = "cached" | "anthropic" | "ollama";
 export type LiveProviderId = "anthropic" | "ollama";
+
+export type LiveProviderFactory = (
+  id: LiveProviderId,
+  config: {
+    anthropicKey: string;
+    anthropicModel: string;
+    ollamaUrl: string;
+    ollamaModel: string;
+  },
+) => LLMProvider | null;
 
 export interface ChatMessage {
   id: string;
@@ -34,7 +45,8 @@ export interface StoreState {
 
   lastGoodGrid: GridReadback | null;
   isGenerating: boolean;
-  lastError: ExecuteError | null;
+  lastError: ExecuteError | LLMProviderError | null;
+  providerNotConfiguredHint: boolean;
 
   messages: ChatMessage[];
 
@@ -51,6 +63,7 @@ export interface StoreState {
   setAnthropicModel: (v: string) => void;
   setOllamaUrl: (v: string) => void;
   setOllamaModel: (v: string) => void;
+  clearProviderNotConfiguredHint: () => void;
   awaitInit: () => Promise<void>;
 }
 

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "./ChatPanel";
+import { SettingsDrawer } from "./SettingsDrawer";
 import { TopStrip } from "./TopStrip";
 import { Viewport } from "./Viewport";
 
@@ -9,6 +10,8 @@ export function App() {
   const [tooNarrow, setTooNarrow] = useState<boolean>(() =>
     typeof window === "undefined" ? false : window.innerWidth < MIN_WIDTH,
   );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const gearRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onResize = () => setTooNarrow(window.innerWidth < MIN_WIDTH);
@@ -26,9 +29,14 @@ export function App() {
 
   return (
     <div className="app">
-      <TopStrip />
+      <TopStrip ref={gearRef} onOpenSettings={() => setSettingsOpen(true)} />
       <Viewport />
       <ChatPanel />
+      <SettingsDrawer
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        returnFocusRef={gearRef}
+      />
     </div>
   );
 }
