@@ -1,3 +1,4 @@
+import { type KeyboardEvent, useState } from "react";
 import { DEFAULT_DEMO, MANIFEST } from "../demos";
 import { useStore } from "../store/react";
 import type { ChatMessage } from "../store/types";
@@ -5,7 +6,28 @@ import type { ChatMessage } from "../store/types";
 export function ChatPanel() {
   const messages = useStore((s) => s.messages);
   const isGenerating = useStore((s) => s.isGenerating);
+  const providerHint = useStore((s) => s.providerNotConfiguredHint);
   const loadCachedDemo = useStore((s) => s.loadCachedDemo);
+  const submitPrompt = useStore((s) => s.submitPrompt);
+  const clearProviderHint = useStore((s) => s.clearProviderNotConfiguredHint);
+
+  const [draft, setDraft] = useState("");
+
+  const canSend = draft.trim().length > 0 && !isGenerating;
+
+  const submit = () => {
+    if (!canSend) return;
+    const prompt = draft;
+    setDraft("");
+    void submitPrompt(prompt);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  };
 
   return (
     <aside className="chat-panel">
@@ -34,31 +56,41 @@ export function ChatPanel() {
           <MessageRow key={m.id} message={m} />
         ))}
       </ol>
+      {providerHint ? (
+        <output className="provider-hint">Add a provider in settings to run live prompts.</output>
+      ) : null}
       <form
         className="chat-panel__input"
         onSubmit={(e) => {
           e.preventDefault();
+          submit();
         }}
       >
         <label className="visually-hidden" htmlFor="prompt-input">
           Prompt
         </label>
-        <input
+        <textarea
           id="prompt-input"
           className="prompt-input"
-          type="text"
           placeholder="Describe what to build..."
-          disabled
-          aria-disabled="true"
+          value={draft}
+          rows={1}
+          disabled={isGenerating}
+          aria-disabled={isGenerating || undefined}
+          onKeyDown={onKeyDown}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (providerHint) clearProviderHint();
+          }}
         />
         <button
           type="submit"
           className="send-button"
-          disabled
-          aria-disabled="true"
+          disabled={!canSend}
+          aria-disabled={!canSend || undefined}
           aria-label="Send prompt"
         >
-          →
+          {isGenerating ? <span className="send-button__spinner" aria-hidden="true" /> : "→"}
         </button>
       </form>
     </aside>
@@ -73,9 +105,14 @@ function MessageRow({ message }: { message: ChatMessage }) {
       {isUser ? (
         <span className="message__text">{message.text}</span>
       ) : (
-        <span className="message__status" data-error={message.errorKind ? "true" : undefined}>
-          {message.label ?? ""}
-        </span>
+        <>
+          <span className="message__status" data-error={message.errorKind ? "true" : undefined}>
+            {message.label ?? ""}
+          </span>
+          {message.errorKind && message.text ? (
+            <span className="message__error-copy">{message.text}</span>
+          ) : null}
+        </>
       )}
     </li>
   );

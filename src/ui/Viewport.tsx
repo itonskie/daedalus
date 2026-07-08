@@ -15,9 +15,15 @@ export function Viewport() {
   return (
     <section className="viewport-region">
       <ViewportCanvas grid={resolvedGrid} />
+      {isGenerating ? (
+        <p className="viewport-region__generating" aria-live="polite">
+          <span className="spinner-dot" aria-hidden="true" />
+          Generating…
+        </p>
+      ) : null}
       {currentPrompt ? (
         <p className="viewport-region__caption" aria-live="polite">
-          {isGenerating ? "Generating…" : currentPrompt}
+          {currentPrompt}
         </p>
       ) : null}
     </section>

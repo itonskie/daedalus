@@ -1,8 +1,15 @@
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { type StoreApi, createStore as createVanillaStore } from "zustand/vanilla";
 import { CACHED_DEMOS, DEFAULT_DEMO, MANIFEST, getPromptText } from "../demos";
+import { AnthropicProvider, type LLMProvider, LLMProviderError } from "../llm";
 import { type ExecuteResult, type Executor, SandboxExecutor } from "../sandbox";
-import { DEFAULT_ANTHROPIC_MODEL, PERSIST_KEY, type ProviderId, type StoreState } from "./types";
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  type LiveProviderFactory,
+  PERSIST_KEY,
+  type ProviderId,
+  type StoreState,
+} from "./types";
 
 export type { CameraState, ChatMessage, ProviderId, StoreState } from "./types";
 export {
@@ -15,7 +22,19 @@ export {
 export interface CreateStoreOptions {
   executor?: Executor;
   persist?: boolean;
+  liveProviderFactory?: LiveProviderFactory;
 }
+
+const defaultLiveProviderFactory: LiveProviderFactory = (id, config) => {
+  if (id === "anthropic") {
+    if (!config.anthropicKey.trim()) return null;
+    return new AnthropicProvider({
+      apiKey: config.anthropicKey,
+      model: config.anthropicModel,
+    });
+  }
+  return null;
+};
 
 let messageIdCounter = 0;
 const nextMessageId = () => `m${++messageIdCounter}`;
@@ -48,6 +67,7 @@ const makeAssistantSuccessMessage = (
 export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<StoreState> {
   const executor = options.executor ?? new SandboxExecutor();
   const shouldPersist = options.persist ?? true;
+  const liveProviderFactory = options.liveProviderFactory ?? defaultLiveProviderFactory;
 
   const initialState = {
     activeProvider: "cached" as ProviderId,
@@ -64,6 +84,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     lastGoodGrid: null,
     isGenerating: false,
     lastError: null,
+    providerNotConfiguredHint: false,
 
     messages: [] as StoreState["messages"],
 
@@ -120,6 +141,88 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       }
     };
 
+    const runLiveGeneration = async (
+      prompt: string,
+      provider: LLMProvider,
+      modelSlug: string,
+      sourceLabelName: "Anthropic" | "Ollama",
+    ): Promise<void> => {
+      const source = provider.id;
+      set({
+        isGenerating: true,
+        providerNotConfiguredHint: false,
+        currentPrompt: prompt,
+        currentSource: source,
+        currentModelSlug: modelSlug,
+        lastError: null,
+        messages: [...get().messages, makeUserMessage(prompt)],
+      });
+
+      let script: string;
+      try {
+        script = await provider.generateVoxelScript(prompt);
+      } catch (thrown) {
+        const err = thrown instanceof LLMProviderError ? thrown : null;
+        set({
+          isGenerating: false,
+          lastError: err,
+          messages: [
+            ...get().messages,
+            {
+              id: nextMessageId(),
+              role: "assistant" as const,
+              text: err?.message ?? "Generation failed.",
+              label: "Error",
+              source,
+              modelSlug,
+              errorKind: "provider",
+            },
+          ],
+        });
+        return;
+      }
+
+      const result = await executor.execute(script);
+      if (result.ok) {
+        set({
+          isGenerating: false,
+          lastError: null,
+          lastGoodGrid: result.grid,
+          currentScript: script,
+          messages: [
+            ...get().messages,
+            {
+              id: nextMessageId(),
+              role: "assistant" as const,
+              text: "",
+              label: `${sourceLabelName} · ${modelSlug}`,
+              source,
+              modelSlug,
+              script,
+            },
+          ],
+        });
+      } else {
+        set({
+          isGenerating: false,
+          lastError: result.error,
+          messages: [
+            ...get().messages,
+            {
+              id: nextMessageId(),
+              role: "assistant" as const,
+              text: result.error.message,
+              label: "Error",
+              source,
+              modelSlug,
+              script,
+              errorKind: result.error.kind,
+            },
+          ],
+        });
+      }
+    };
+
     const submitPrompt = async (prompt: string): Promise<void> => {
       const trimmed = prompt.trim();
       if (!trimmed) return;
@@ -131,8 +234,29 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
           await loadCachedDemo(match.slug, DEFAULT_DEMO.modelSlug);
           return;
         }
+        return;
       }
-      // Live provider paths are wired in slices 4/5.
+
+      if (state.activeProvider === "anthropic") {
+        const provider = liveProviderFactory("anthropic", {
+          anthropicKey: state.anthropicKey,
+          anthropicModel: state.anthropicModel,
+          ollamaUrl: state.ollamaUrl,
+          ollamaModel: state.ollamaModel,
+        });
+        if (!provider) {
+          set({ providerNotConfiguredHint: true });
+          return;
+        }
+        await runLiveGeneration(prompt, provider, state.anthropicModel, "Anthropic");
+        return;
+      }
+
+      // Ollama live path wired in slice 5.
+    };
+
+    const clearProviderNotConfiguredHint = () => {
+      if (get().providerNotConfiguredHint) set({ providerNotConfiguredHint: false });
     };
 
     const setProvider = (id: ProviderId) => set({ activeProvider: id });
@@ -167,6 +291,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       setAnthropicModel,
       setOllamaUrl,
       setOllamaModel,
+      clearProviderNotConfiguredHint,
       awaitInit,
     };
   };
