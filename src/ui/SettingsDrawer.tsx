@@ -30,6 +30,7 @@ export function SettingsDrawer({ isOpen, onClose, returnFocusRef }: SettingsDraw
 
   const drawerRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,8 +63,10 @@ export function SettingsDrawer({ isOpen, onClose, returnFocusRef }: SettingsDraw
         'input, select, textarea, button, [tabindex]:not([tabindex="-1"])',
       );
       first?.focus();
-    } else if (!isOpen && returnFocusRef?.current) {
+      wasOpenRef.current = true;
+    } else if (!isOpen && wasOpenRef.current && returnFocusRef?.current) {
       returnFocusRef.current.focus();
+      wasOpenRef.current = false;
     }
   }, [isOpen, returnFocusRef]);
 

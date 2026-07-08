@@ -219,13 +219,6 @@ body {
   pointer-events: none;
 }
 
-/* Legacy .viewport (from slice 1) kept as a fallback for standalone canvases. */
-.viewport:not(.viewport-region .viewport) {
-  position: fixed;
-  inset: 0;
-  background-color: var(--color-background);
-}
-
 /* ============================================================
    Chat panel
    ============================================================ */
