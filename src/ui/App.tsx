@@ -1,12 +1,26 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ViewportCanvas } from "../renderer";
-import { createGrid } from "../voxel";
+import { SandboxExecutor } from "../sandbox";
+import { type GridReadback, createGrid } from "../voxel";
+
+const TRACER_SCRIPT = 'sphere(32, 24, 32, 8, "red")';
+
+const EMPTY_GRID: GridReadback = createGrid().readback();
 
 export function App() {
-  const grid = useMemo(() => {
-    const g = createGrid();
-    g.sphere(32, 24, 32, 8, "red");
-    return g.readback();
-  }, []);
+  const executor = useMemo(() => new SandboxExecutor(), []);
+  const [grid, setGrid] = useState<GridReadback>(EMPTY_GRID);
+
+  useEffect(() => {
+    let cancelled = false;
+    executor.execute(TRACER_SCRIPT).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setGrid(result.grid);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [executor]);
+
   return <ViewportCanvas grid={grid} />;
 }
