@@ -675,7 +675,8 @@ body {
   transition: color 100ms ease-out;
 }
 
-.viewport-region:has(.viewport-region__failed) .viewport-region__view-code {
+.viewport-region:has(.viewport-region__failed) .viewport-region__view-code,
+.viewport-region:has(.viewport-region__generating) .viewport-region__view-code {
   bottom: calc(var(--space-md) + 48px);
 }
 
