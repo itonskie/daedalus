@@ -1,84 +1,111 @@
 # daedalus
 
-A browser-based voxel editor for makers, indie game devs, and anyone who'd reach for MagicaVoxel but wishes it ran in the browser, was open source, and had power-user export.
+A browser-based demo of the **code-execution-tool-use pattern**: the LLM writes a short JavaScript program that calls a small voxel API, the program runs in a sandboxed Web Worker, and the result renders as a 64³ voxel scene in three.js.
 
-Build chunky 3D models by placing/painting voxels in a real-time orbit view, then export to STL for 3D printing, GLTF/GLB for games and the web, or save as MagicaVoxel-compatible `.vox`.
+Voxels are the medium. The pattern is the artifact.
 
-## Why
+## What you'll see
 
-MagicaVoxel is the gold-standard voxel editor — and it's desktop-only, closed source, and dated. Goxel is open but desktop-only. Browser voxel editors exist but most are toys without serious export pipelines.
+Open the page. A cached demo (`a small castle with four towers`) is already rendered — no key, no install, no configuration.
 
-`daedalus` is the modern, browser-first, open-source take: instant load via URL, real export pipeline (greedy meshing + STL/GLTF optimization), MagicaVoxel `.vox` import for compatibility with existing libraries, and a clean React-Three-Fiber editor surface.
+Click one of the six chips (`red sphere`, `green tree`, `castle`, `spiral staircase`, `robot`, `mushroom`) to browse the cached set. Or open Settings, paste an Anthropic API key or point at a local Ollama, and type your own prompt against a live model.
 
-Named for Daedalus — the mythological master craftsman who built the labyrinth and invented mechanical wings. Patron saint of builders.
+`Compare models` renders the same prompt through Claude and Qwen3-Coder side by side, under one shared orbit camera. Cached only — the visitor never needs both providers configured to see the comparison.
 
-## Status
+![Compare Models view: Claude vs. Qwen3-Coder on "a spiral staircase" — Claude builds a proper helical staircase around a central pillar; Qwen3-Coder produces a flat spiral](docs/img/compare-staircase.png)
 
-🚧 **In design / pre-alpha.** Public repo is up so the design can iterate in the open. Implementation begins shortly.
+`Show code` on any generated result reveals the JavaScript the model actually wrote. That script IS the artifact — the voxel scene is just how you look at it.
 
-## v1 Scope
+![Code panel showing the one-line generated script for a red sphere, rendered in the viewport](docs/img/code-panel.png)
 
-- **Grid** up to 128³ voxels
-- **Tools**: place, erase, paint, eyedropper
-- **Custom color palette** with save/load
-- **Mirror modes** (X / Y / Z) for symmetrical builds
-- **Orbit + pan camera**, orthographic/perspective toggle
-- **Undo / redo** history
-- **Export**: STL (3D print) and GLTF/GLB (games, web)
-- **Import**: MagicaVoxel `.vox` files
-- **Project save/load** as plain JSON files — your projects live on your disk, not our servers
+## Quickstart
 
-Deferred to later: layers, animation, materials (emissive/transparent), STL → voxelize import, multi-user collaboration, asset gallery.
+```bash
+git clone https://github.com/itonskie/daedalus.git
+cd daedalus
+pnpm install
+pnpm dev
+```
+
+Cached demos work with zero configuration. Everything else is opt-in.
+
+## BYOK — Anthropic
+
+- Open `Settings` in the top strip.
+- Paste an Anthropic API key.
+- Optionally pick a model (default: `claude-sonnet-4-6`).
+- Key persists in `localStorage`. Nothing is sent anywhere except the Anthropic Messages API from your browser.
+
+## BYOK — local Ollama
+
+Install [Ollama](https://ollama.com) and pull a coder model:
+
+```bash
+ollama pull qwen3.6:27b-coding-nvfp4    # recommended, 19 GB
+# or a lower-hardware fallback:
+ollama pull qwen3.5:latest              # 6.6 GB, general-purpose
+```
+
+Then in `Settings`:
+- URL (default `http://localhost:11434`)
+- Model name
+
+Toggle the active provider in the top strip.
+
+## Regenerating the cached demos
+
+The six cached demos live at `demos/<prompt-slug>/<model-slug>.js`, checked into the repo as plain JavaScript files so they diff cleanly in PRs.
+
+```bash
+# Requires ANTHROPIC_API_KEY and a running Ollama for the model slugs listed
+# in demos/manifest.json. Fails loud when a provider isn't configured.
+pnpm bench
+```
+
+## Architecture at a glance
+
+Static frontend. Four deep modules behind small, stable interfaces. Thin React glue on top.
+
+```
+                 +---------------------+
+                 |    React UI         |
+                 |  (chat, viewport,   |
+                 |   settings, code,   |
+                 |   compare)          |
+                 +----------+----------+
+                            |
+                    Zustand store
+                            |
+      +---------------------+---------------------+
+      |                     |                     |
+      v                     v                     v
++-----------+       +---------------+     +--------------+
+| LLM       |       | Sandbox       |     | Voxel        |
+| Provider  |       | Executor      |     | Renderer     |
+| (deep)    |       | (deep)        |     | (deep)       |
++-----+-----+       +-------+-------+     +------+-------+
+      |                     |                    |
+  fetch to               Web Worker           three.js
+  Anthropic /            (isolated)           InstancedMesh
+  Ollama                     |
+                             v
+                     +---------------+
+                     | Voxel API     |
+                     | + Grid        |
+                     | (deep)        |
+                     +---------------+
+```
+
+- **LLMProvider** — one interface (`generateVoxelScript(prompt): Promise<string>`), two implementations (Anthropic, Ollama). Cached demos are not a provider; they're the store's default state.
+- **Sandbox Executor** — Web Worker per generation. Injects the voxel API as globals. Catches syntax errors, runtime throws, timeouts, unknown palette colors, and returns a structured `{ grid, error?, durationMs }`.
+- **Voxel API + Grid** — 64³ grid, 16-color named palette, four primitives (`place`, `box`, `sphere`, `line`). Frozen so the system prompt stays short and cached demos never break.
+- **Voxel Renderer** — three.js `InstancedMesh` sized to occupied cells. Shared orbit camera across both panes in Compare view.
+
+Full spec: [PRD #2](docs/specs/prds/2-daedalus-mvp-llm-generated-voxels.md). Engineering detail: [`docs/specs/engineering-spec.md`](docs/specs/engineering-spec.md).
 
 ## Stack
 
-**Frontend** — TypeScript / React
-- **Vite** — dev server & bundling
-- **React Three Fiber** + **drei** — declarative Three.js
-- **Three.js InstancedMesh** — fast voxel rendering at 128³ scale
-- **Zustand** — state for voxel grid, palette, camera
-- **Tailwind CSS** — toolbars & panels
-- **Vitest** — tests
-- **Biome** — lint + format
-
-**Backend** — Go
-- **Go 1.22+**
-- **Chi** router (or stdlib `net/http`)
-- **Greedy meshing** algorithm (hand-rolled) — the core technical showpiece
-- STL writer (binary), GLTF writer via [`qmuntal/gltf`](https://github.com/qmuntal/gltf)
-- MagicaVoxel `.vox` parser
-- Single static binary that embeds the built frontend via Go `embed`
-
-## Architecture
-
-Interactive editing runs entirely in the browser for instant feedback. The Go backend is invoked for the heavy lifting:
-
-- `POST /export/stl` → voxel data → greedy meshing → optimized STL stream
-- `POST /export/gltf` → voxel data → greedy meshing → optimized GLB stream
-- `POST /import/vox` → MagicaVoxel `.vox` → JSON voxel data
-
-Local-first by design: no accounts, no database, no cloud storage. Projects are files on your disk.
-
-## Install (when v1 ships)
-
-```bash
-# Single binary — opens localhost:7777 in your browser
-./daedalus
-```
-
-Cross-platform releases (Linux / macOS / Windows) via GoReleaser.
-
-## Development
-
-```bash
-# Frontend
-cd web && pnpm install && pnpm dev
-
-# Backend
-go run ./cmd/daedalus
-```
-
-(Once scaffolded.)
+TypeScript / React 18 / Vite / three.js `InstancedMesh` / Zustand / Vitest / Biome. No backend, no build-time secrets — `pnpm dev` and static assets are the whole runtime.
 
 ## License
 

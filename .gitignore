@@ -6,6 +6,7 @@ coverage
 .env
 .env.local
 .env.*.local
+CLAUDE.local.md
 
 # Backend (Go)
 /daedalus
@@ -22,3 +23,11 @@ vendor/
 
 # Local workspace
 .daedalus/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+# Walkthrough screenshots — Playwright MCP writes to repo root by default
+/[0-9][0-9]-*.png
+
+# TypeScript build info
+*.tsbuildinfo
