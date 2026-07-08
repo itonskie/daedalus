@@ -99,6 +99,9 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
 
     cameraA: null,
     cameraB: null,
+    cameraCompare: null,
+
+    view: "editor" as const,
 
     isCodePanelOpen: false,
     codePanelSource: null,
@@ -336,6 +339,14 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     const setOllamaUrl = (v: string) => set({ ollamaUrl: v });
     const setOllamaModel = (v: string) => set({ ollamaModel: v });
 
+    const setView = (view: StoreState["view"]) => {
+      if (get().view === view) return;
+      set({ view });
+    };
+
+    const setCameraCompare = (state: NonNullable<StoreState["cameraCompare"]>) =>
+      set({ cameraCompare: state });
+
     const awaitInit = async (): Promise<void> => {
       const p = get().initPromise;
       if (p) await p;
@@ -353,6 +364,8 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       clearProviderNotConfiguredHint,
       openCodePanel,
       closeCodePanel,
+      setView,
+      setCameraCompare,
       awaitInit,
     };
   };

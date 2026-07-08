@@ -17,6 +17,7 @@ export const TopStrip = forwardRef<HTMLButtonElement, TopStripProps>(function To
   const anthropicKey = useStore((s) => s.anthropicKey);
   const ollamaUrl = useStore((s) => s.ollamaUrl);
   const cycleProvider = useStore((s) => s.cycleProvider);
+  const setView = useStore((s) => s.setView);
 
   const configuredCount = 1 + (anthropicKey.trim() ? 1 : 0) + (ollamaUrl.trim() ? 1 : 0);
   const canCycle = configuredCount > 1;
@@ -25,6 +26,13 @@ export const TopStrip = forwardRef<HTMLButtonElement, TopStripProps>(function To
     <header className="top-strip">
       <span className="top-strip__brand">daedalus</span>
       <div className="top-strip__right">
+        <button
+          type="button"
+          className="top-strip__compare-link"
+          onClick={() => setView("compare")}
+        >
+          Compare models
+        </button>
         <button
           type="button"
           className="top-strip__provider"
