@@ -229,7 +229,7 @@ export function SettingsDrawer({ isOpen, onClose, returnFocusRef }: SettingsDraw
               className="mono-input"
               type="text"
               value={modelDraft}
-              placeholder="qwen3-coder:30b"
+              placeholder="qwen3.6:27b-coding-nvfp4"
               onChange={(e) => setModelDraft(e.target.value)}
               onBlur={commitModel}
             />

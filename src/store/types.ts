@@ -91,5 +91,5 @@ export interface StoreState {
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
-export const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b";
+export const DEFAULT_OLLAMA_MODEL = "qwen3.6:27b-coding-nvfp4";
 export const PERSIST_KEY = "daedalus-mvp-v1";
