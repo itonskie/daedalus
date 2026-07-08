@@ -1,7 +1,7 @@
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { type StoreApi, createStore as createVanillaStore } from "zustand/vanilla";
 import { CACHED_DEMOS, DEFAULT_DEMO, MANIFEST, getPromptText } from "../demos";
-import { AnthropicProvider, type LLMProvider, LLMProviderError } from "../llm";
+import { AnthropicProvider, type LLMProvider, LLMProviderError, OllamaProvider } from "../llm";
 import { type ExecuteResult, type Executor, SandboxExecutor } from "../sandbox";
 import {
   DEFAULT_ANTHROPIC_MODEL,
@@ -31,6 +31,13 @@ const defaultLiveProviderFactory: LiveProviderFactory = (id, config) => {
     return new AnthropicProvider({
       apiKey: config.anthropicKey,
       model: config.anthropicModel,
+    });
+  }
+  if (id === "ollama") {
+    if (!config.ollamaUrl.trim()) return null;
+    return new OllamaProvider({
+      baseUrl: config.ollamaUrl,
+      model: config.ollamaModel,
     });
   }
   return null;
@@ -252,7 +259,20 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
         return;
       }
 
-      // Ollama live path wired in slice 5.
+      if (state.activeProvider === "ollama") {
+        const provider = liveProviderFactory("ollama", {
+          anthropicKey: state.anthropicKey,
+          anthropicModel: state.anthropicModel,
+          ollamaUrl: state.ollamaUrl,
+          ollamaModel: state.ollamaModel,
+        });
+        if (!provider) {
+          set({ providerNotConfiguredHint: true });
+          return;
+        }
+        await runLiveGeneration(prompt, provider, state.ollamaModel, "Ollama");
+        return;
+      }
     };
 
     const clearProviderNotConfiguredHint = () => {
@@ -265,7 +285,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       const s = get();
       const configured: ProviderId[] = ["cached"];
       if (s.anthropicKey.trim()) configured.push("anthropic");
-      if (s.ollamaUrl.trim() && s.ollamaModel.trim()) configured.push("ollama");
+      if (s.ollamaUrl.trim()) configured.push("ollama");
       if (configured.length <= 1) return;
       const idx = configured.indexOf(s.activeProvider);
       const next = configured[(idx + 1) % configured.length];
