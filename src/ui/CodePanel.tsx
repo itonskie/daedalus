@@ -15,6 +15,7 @@ export function CodePanel() {
   const script = useStore((s) => s.codePanelScript);
   const source = useStore((s) => s.codePanelSource);
   const modelSlug = useStore((s) => s.codePanelModelSlug);
+  const errorCopy = useStore((s) => s.codePanelErrorCopy);
   const close = useStore((s) => s.closeCodePanel);
 
   const panelRef = useRef<HTMLDialogElement | null>(null);
@@ -95,6 +96,11 @@ export function CodePanel() {
           ×
         </button>
       </div>
+      {errorCopy ? (
+        <p role="alert" className="code-panel__error-banner">
+          {errorCopy}
+        </p>
+      ) : null}
       <pre data-testid="code-panel__body" className="code-panel__body" aria-label="script">
         {script}
       </pre>

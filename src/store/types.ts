@@ -24,6 +24,7 @@ export interface ChatMessage {
   modelSlug?: string;
   script?: string;
   errorKind?: ExecuteError["kind"] | "provider";
+  errorCopy?: string;
 }
 
 export interface CameraState {
@@ -47,6 +48,7 @@ export interface StoreState {
   isGenerating: boolean;
   lastError: ExecuteError | LLMProviderError | null;
   providerNotConfiguredHint: boolean;
+  showLastFailedHint: boolean;
 
   messages: ChatMessage[];
 
@@ -57,6 +59,7 @@ export interface StoreState {
   codePanelSource: ProviderId | null;
   codePanelModelSlug: string | null;
   codePanelScript: string | null;
+  codePanelErrorCopy: string | null;
 
   initPromise: Promise<void> | null;
 
@@ -69,7 +72,12 @@ export interface StoreState {
   setOllamaUrl: (v: string) => void;
   setOllamaModel: (v: string) => void;
   clearProviderNotConfiguredHint: () => void;
-  openCodePanel: (source: ProviderId, script: string, modelSlug: string) => void;
+  openCodePanel: (
+    source: ProviderId,
+    script: string,
+    modelSlug: string,
+    errorCopy?: string,
+  ) => void;
   closeCodePanel: () => void;
   awaitInit: () => Promise<void>;
 }

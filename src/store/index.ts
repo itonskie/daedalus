@@ -3,6 +3,7 @@ import { type StoreApi, createStore as createVanillaStore } from "zustand/vanill
 import { CACHED_DEMOS, DEFAULT_DEMO, MANIFEST, getPromptText } from "../demos";
 import { AnthropicProvider, type LLMProvider, LLMProviderError, OllamaProvider } from "../llm";
 import { type ExecuteResult, type Executor, SandboxExecutor } from "../sandbox";
+import { errorToCopy } from "./error-copy";
 import {
   DEFAULT_ANTHROPIC_MODEL,
   type LiveProviderFactory,
@@ -92,6 +93,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     isGenerating: false,
     lastError: null,
     providerNotConfiguredHint: false,
+    showLastFailedHint: false,
 
     messages: [] as StoreState["messages"],
 
@@ -102,6 +104,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     codePanelSource: null,
     codePanelModelSlug: null,
     codePanelScript: null,
+    codePanelErrorCopy: null,
 
     initPromise: null,
   };
@@ -130,23 +133,27 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
           lastGoodGrid: result.grid,
           isGenerating: false,
           lastError: null,
+          showLastFailedHint: false,
           messages: [...get().messages, makeAssistantSuccessMessage("cached", modelSlug, script)],
         });
       } else {
+        const copy = errorToCopy(result.error, { ollamaUrl: get().ollamaUrl });
         set({
           isGenerating: false,
           lastError: result.error,
+          showLastFailedHint: true,
           messages: [
             ...get().messages,
             {
               id: nextMessageId(),
               role: "assistant" as const,
-              text: result.error.message,
+              text: copy,
               label: "Error",
               source: "cached" as ProviderId,
               modelSlug,
               script,
               errorKind: result.error.kind,
+              errorCopy: copy,
             },
           ],
         });
@@ -175,19 +182,22 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
         script = await provider.generateVoxelScript(prompt);
       } catch (thrown) {
         const err = thrown instanceof LLMProviderError ? thrown : null;
+        const copy = err ? errorToCopy(err, { ollamaUrl: get().ollamaUrl }) : "Generation failed.";
         set({
           isGenerating: false,
           lastError: err,
+          showLastFailedHint: true,
           messages: [
             ...get().messages,
             {
               id: nextMessageId(),
               role: "assistant" as const,
-              text: err?.message ?? "Generation failed.",
+              text: copy,
               label: "Error",
               source,
               modelSlug,
               errorKind: "provider",
+              errorCopy: copy,
             },
           ],
         });
@@ -199,6 +209,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
         set({
           isGenerating: false,
           lastError: null,
+          showLastFailedHint: false,
           lastGoodGrid: result.grid,
           currentScript: script,
           messages: [
@@ -215,20 +226,23 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
           ],
         });
       } else {
+        const copy = errorToCopy(result.error, { ollamaUrl: get().ollamaUrl });
         set({
           isGenerating: false,
           lastError: result.error,
+          showLastFailedHint: true,
           messages: [
             ...get().messages,
             {
               id: nextMessageId(),
               role: "assistant" as const,
-              text: result.error.message,
+              text: copy,
               label: "Error",
               source,
               modelSlug,
               script,
               errorKind: result.error.kind,
+              errorCopy: copy,
             },
           ],
         });
@@ -297,12 +311,18 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       set({ activeProvider: next });
     };
 
-    const openCodePanel = (source: ProviderId, script: string, modelSlug: string) => {
+    const openCodePanel = (
+      source: ProviderId,
+      script: string,
+      modelSlug: string,
+      errorCopy?: string,
+    ) => {
       set({
         isCodePanelOpen: true,
         codePanelSource: source,
         codePanelScript: script,
         codePanelModelSlug: modelSlug,
+        codePanelErrorCopy: errorCopy ?? null,
       });
     };
 
