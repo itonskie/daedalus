@@ -51,10 +51,9 @@ export const TopStrip = forwardRef<HTMLButtonElement, TopStripProps>(function To
           ref={gearRef}
           type="button"
           className="top-strip__gear"
-          aria-label="Open settings"
           onClick={onOpenSettings}
         >
-          ⚙
+          Settings
         </button>
       </div>
     </header>
