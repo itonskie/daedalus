@@ -22,3 +22,9 @@ vendor/
 
 # Local workspace
 .daedalus/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# TypeScript build info
+*.tsbuildinfo
