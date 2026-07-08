@@ -12,9 +12,11 @@ Click one of the six chips (`red sphere`, `green tree`, `castle`, `spiral stairc
 
 `Compare models` renders the same prompt through Claude and Qwen3-Coder side by side, under one shared orbit camera. Cached only — the visitor never needs both providers configured to see the comparison.
 
+![Compare Models view: Claude vs. Qwen3-Coder on "a spiral staircase" — Claude builds a proper helical staircase around a central pillar; Qwen3-Coder produces a flat spiral](docs/img/compare-staircase.png)
+
 `Show code` on any generated result reveals the JavaScript the model actually wrote. That script IS the artifact — the voxel scene is just how you look at it.
 
-<!-- portfolio: drop screenshots here -->
+![Code panel showing the one-line generated script for a red sphere, rendered in the viewport](docs/img/code-panel.png)
 
 ## Quickstart
 
