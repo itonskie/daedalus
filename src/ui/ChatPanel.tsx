@@ -103,10 +103,16 @@ function MessageRow({
   openCodePanel,
 }: {
   message: ChatMessage;
-  openCodePanel: (source: ProviderId, script: string, modelSlug: string) => void;
+  openCodePanel: (
+    source: ProviderId,
+    script: string,
+    modelSlug: string,
+    errorCopy?: string,
+  ) => void;
 }) {
   const isUser = message.role === "user";
   const canShowCode = !isUser && !!message.script && !!message.source && !!message.modelSlug;
+  const isScriptError = message.errorKind === "syntax" || message.errorKind === "runtime";
   return (
     <li className={`message message--${message.role}`}>
       <span className="message__label">{isUser ? "user:" : "assistant:"}</span>
@@ -127,7 +133,12 @@ function MessageRow({
               onClick={(e) => {
                 e.stopPropagation();
                 if (message.script && message.source && message.modelSlug) {
-                  openCodePanel(message.source, message.script, message.modelSlug);
+                  openCodePanel(
+                    message.source,
+                    message.script,
+                    message.modelSlug,
+                    isScriptError ? (message.errorCopy ?? message.text) : undefined,
+                  );
                 }
               }}
             >
