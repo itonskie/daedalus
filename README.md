@@ -41,9 +41,9 @@ Cached demos work with zero configuration. Everything else is opt-in.
 Install [Ollama](https://ollama.com) and pull a coder model:
 
 ```bash
-ollama pull qwen3-coder:30b     # default
+ollama pull qwen3.6:27b-coding-nvfp4    # recommended, 19 GB
 # or a lower-hardware fallback:
-ollama pull qwen2.5-coder:14b
+ollama pull qwen3.5:latest              # 6.6 GB, general-purpose
 ```
 
 Then in `Settings`:
