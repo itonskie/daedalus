@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useState } from "react";
 import { DEFAULT_DEMO, MANIFEST } from "../demos";
 import { useStore } from "../store/react";
-import type { ChatMessage } from "../store/types";
+import type { ChatMessage, ProviderId } from "../store/types";
 
 export function ChatPanel() {
   const messages = useStore((s) => s.messages);
@@ -10,6 +10,7 @@ export function ChatPanel() {
   const loadCachedDemo = useStore((s) => s.loadCachedDemo);
   const submitPrompt = useStore((s) => s.submitPrompt);
   const clearProviderHint = useStore((s) => s.clearProviderNotConfiguredHint);
+  const openCodePanel = useStore((s) => s.openCodePanel);
 
   const [draft, setDraft] = useState("");
 
@@ -53,7 +54,7 @@ export function ChatPanel() {
       </div>
       <ol className="chat-panel__messages" aria-live="polite">
         {messages.map((m) => (
-          <MessageRow key={m.id} message={m} />
+          <MessageRow key={m.id} message={m} openCodePanel={openCodePanel} />
         ))}
       </ol>
       {providerHint ? (
@@ -97,8 +98,15 @@ export function ChatPanel() {
   );
 }
 
-function MessageRow({ message }: { message: ChatMessage }) {
+function MessageRow({
+  message,
+  openCodePanel,
+}: {
+  message: ChatMessage;
+  openCodePanel: (source: ProviderId, script: string, modelSlug: string) => void;
+}) {
   const isUser = message.role === "user";
+  const canShowCode = !isUser && !!message.script && !!message.source && !!message.modelSlug;
   return (
     <li className={`message message--${message.role}`}>
       <span className="message__label">{isUser ? "user:" : "assistant:"}</span>
@@ -111,6 +119,20 @@ function MessageRow({ message }: { message: ChatMessage }) {
           </span>
           {message.errorKind && message.text ? (
             <span className="message__error-copy">{message.text}</span>
+          ) : null}
+          {canShowCode ? (
+            <button
+              type="button"
+              className="message__show-code"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (message.script && message.source && message.modelSlug) {
+                  openCodePanel(message.source, message.script, message.modelSlug);
+                }
+              }}
+            >
+              show code
+            </button>
           ) : null}
         </>
       )}

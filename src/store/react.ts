@@ -10,6 +10,10 @@ export function getStore(): StoreApi<StoreState> {
   return singleton;
 }
 
+export function __resetStoreForTesting(): void {
+  singleton = null;
+}
+
 export function useStore<T>(selector: (s: StoreState) => T): T {
   return useZustandStore(getStore(), selector);
 }

@@ -98,6 +98,11 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     cameraA: null,
     cameraB: null,
 
+    isCodePanelOpen: false,
+    codePanelSource: null,
+    codePanelModelSlug: null,
+    codePanelScript: null,
+
     initPromise: null,
   };
 
@@ -292,6 +297,20 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       set({ activeProvider: next });
     };
 
+    const openCodePanel = (source: ProviderId, script: string, modelSlug: string) => {
+      set({
+        isCodePanelOpen: true,
+        codePanelSource: source,
+        codePanelScript: script,
+        codePanelModelSlug: modelSlug,
+      });
+    };
+
+    const closeCodePanel = () => {
+      if (!get().isCodePanelOpen) return;
+      set({ isCodePanelOpen: false });
+    };
+
     const setAnthropicKey = (v: string) => set({ anthropicKey: v });
     const setAnthropicModel = (v: string) => set({ anthropicModel: v });
     const setOllamaUrl = (v: string) => set({ ollamaUrl: v });
@@ -312,6 +331,8 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       setOllamaUrl,
       setOllamaModel,
       clearProviderNotConfiguredHint,
+      openCodePanel,
+      closeCodePanel,
       awaitInit,
     };
   };

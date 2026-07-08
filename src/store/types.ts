@@ -53,6 +53,11 @@ export interface StoreState {
   cameraA: CameraState | null;
   cameraB: CameraState | null;
 
+  isCodePanelOpen: boolean;
+  codePanelSource: ProviderId | null;
+  codePanelModelSlug: string | null;
+  codePanelScript: string | null;
+
   initPromise: Promise<void> | null;
 
   loadCachedDemo: (promptSlug: string, modelSlug: string) => Promise<void>;
@@ -64,6 +69,8 @@ export interface StoreState {
   setOllamaUrl: (v: string) => void;
   setOllamaModel: (v: string) => void;
   clearProviderNotConfiguredHint: () => void;
+  openCodePanel: (source: ProviderId, script: string, modelSlug: string) => void;
+  closeCodePanel: () => void;
   awaitInit: () => Promise<void>;
 }
 
