@@ -32,6 +32,8 @@ export interface CameraState {
   target: [number, number, number];
 }
 
+export type ViewMode = "editor" | "compare";
+
 export interface StoreState {
   activeProvider: ProviderId;
   anthropicKey: string;
@@ -54,6 +56,9 @@ export interface StoreState {
 
   cameraA: CameraState | null;
   cameraB: CameraState | null;
+  cameraCompare: CameraState | null;
+
+  view: ViewMode;
 
   isCodePanelOpen: boolean;
   codePanelSource: ProviderId | null;
@@ -79,6 +84,8 @@ export interface StoreState {
     errorCopy?: string,
   ) => void;
   closeCodePanel: () => void;
+  setView: (view: ViewMode) => void;
+  setCameraCompare: (state: CameraState) => void;
   awaitInit: () => Promise<void>;
 }
 

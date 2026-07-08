@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useStore } from "../store/react";
 import { ChatPanel } from "./ChatPanel";
 import { CodePanel } from "./CodePanel";
+import { CompareView } from "./CompareView";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { TopStrip } from "./TopStrip";
 import { Viewport } from "./Viewport";
@@ -13,6 +15,7 @@ export function App() {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const gearRef = useRef<HTMLButtonElement>(null);
+  const view = useStore((s) => s.view);
 
   useEffect(() => {
     const onResize = () => setTooNarrow(window.innerWidth < MIN_WIDTH);
@@ -24,6 +27,15 @@ export function App() {
     return (
       <div className="too-narrow">
         <p>daedalus is built for a bigger screen</p>
+      </div>
+    );
+  }
+
+  if (view === "compare") {
+    return (
+      <div className="app app--compare">
+        <CompareView />
+        <CodePanel />
       </div>
     );
   }
