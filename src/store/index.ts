@@ -1,0 +1,234 @@
+import { persist, subscribeWithSelector } from "zustand/middleware";
+import { type StoreApi, createStore as createVanillaStore } from "zustand/vanilla";
+import { CACHED_DEMOS, DEFAULT_DEMO, MANIFEST, getPromptText } from "../demos";
+import { type ExecuteResult, type Executor, SandboxExecutor } from "../sandbox";
+import { DEFAULT_ANTHROPIC_MODEL, PERSIST_KEY, type ProviderId, type StoreState } from "./types";
+
+export type { CameraState, ChatMessage, ProviderId, StoreState } from "./types";
+export {
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_URL,
+  PERSIST_KEY,
+} from "./types";
+
+export interface CreateStoreOptions {
+  executor?: Executor;
+  persist?: boolean;
+}
+
+let messageIdCounter = 0;
+const nextMessageId = () => `m${++messageIdCounter}`;
+
+const CACHED_LABEL = "Cached example";
+
+const sourceLabel = (source: ProviderId): string =>
+  source === "anthropic" ? "Anthropic" : source === "ollama" ? "Ollama" : "Cached";
+
+const makeUserMessage = (text: string): StoreState["messages"][number] => ({
+  id: nextMessageId(),
+  role: "user",
+  text,
+});
+
+const makeAssistantSuccessMessage = (
+  source: ProviderId,
+  modelSlug: string,
+  script: string,
+): StoreState["messages"][number] => ({
+  id: nextMessageId(),
+  role: "assistant",
+  text: "",
+  label: source === "cached" ? CACHED_LABEL : `${sourceLabel(source)} · ${modelSlug}`,
+  source,
+  modelSlug,
+  script,
+});
+
+export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<StoreState> {
+  const executor = options.executor ?? new SandboxExecutor();
+  const shouldPersist = options.persist ?? true;
+
+  const initialState = {
+    activeProvider: "cached" as ProviderId,
+    anthropicKey: "",
+    anthropicModel: DEFAULT_ANTHROPIC_MODEL,
+    ollamaUrl: "",
+    ollamaModel: "",
+
+    currentPrompt: null,
+    currentScript: null,
+    currentSource: null,
+    currentModelSlug: null,
+
+    lastGoodGrid: null,
+    isGenerating: false,
+    lastError: null,
+
+    messages: [] as StoreState["messages"],
+
+    cameraA: null,
+    cameraB: null,
+
+    initPromise: null,
+  };
+
+  const buildActions = (
+    set: StoreApi<StoreState>["setState"],
+    get: StoreApi<StoreState>["getState"],
+  ) => {
+    const loadCachedDemo = async (promptSlug: string, modelSlug: string): Promise<void> => {
+      const script = CACHED_DEMOS[promptSlug]?.[modelSlug];
+      const text = getPromptText(promptSlug);
+      if (!script || !text) return;
+
+      set({
+        isGenerating: true,
+        currentPrompt: text,
+        currentSource: "cached",
+        currentModelSlug: modelSlug,
+        currentScript: script,
+        messages: [...get().messages, makeUserMessage(text)],
+      });
+
+      const result = await executor.execute(script);
+      if (result.ok) {
+        set({
+          lastGoodGrid: result.grid,
+          isGenerating: false,
+          lastError: null,
+          messages: [...get().messages, makeAssistantSuccessMessage("cached", modelSlug, script)],
+        });
+      } else {
+        set({
+          isGenerating: false,
+          lastError: result.error,
+          messages: [
+            ...get().messages,
+            {
+              id: nextMessageId(),
+              role: "assistant" as const,
+              text: result.error.message,
+              label: "Error",
+              source: "cached" as ProviderId,
+              modelSlug,
+              script,
+              errorKind: result.error.kind,
+            },
+          ],
+        });
+      }
+    };
+
+    const submitPrompt = async (prompt: string): Promise<void> => {
+      const trimmed = prompt.trim();
+      if (!trimmed) return;
+      const state = get();
+
+      if (state.activeProvider === "cached") {
+        const match = MANIFEST.prompts.find((p) => p.text === trimmed);
+        if (match) {
+          await loadCachedDemo(match.slug, DEFAULT_DEMO.modelSlug);
+          return;
+        }
+      }
+      // Live provider paths are wired in slices 4/5.
+    };
+
+    const setProvider = (id: ProviderId) => set({ activeProvider: id });
+
+    const cycleProvider = () => {
+      const s = get();
+      const configured: ProviderId[] = ["cached"];
+      if (s.anthropicKey.trim()) configured.push("anthropic");
+      if (s.ollamaUrl.trim() && s.ollamaModel.trim()) configured.push("ollama");
+      if (configured.length <= 1) return;
+      const idx = configured.indexOf(s.activeProvider);
+      const next = configured[(idx + 1) % configured.length];
+      set({ activeProvider: next });
+    };
+
+    const setAnthropicKey = (v: string) => set({ anthropicKey: v });
+    const setAnthropicModel = (v: string) => set({ anthropicModel: v });
+    const setOllamaUrl = (v: string) => set({ ollamaUrl: v });
+    const setOllamaModel = (v: string) => set({ ollamaModel: v });
+
+    const awaitInit = async (): Promise<void> => {
+      const p = get().initPromise;
+      if (p) await p;
+    };
+
+    return {
+      loadCachedDemo,
+      submitPrompt,
+      setProvider,
+      cycleProvider,
+      setAnthropicKey,
+      setAnthropicModel,
+      setOllamaUrl,
+      setOllamaModel,
+      awaitInit,
+    };
+  };
+
+  const initializer = (
+    set: StoreApi<StoreState>["setState"],
+    get: StoreApi<StoreState>["getState"],
+  ): StoreState => ({
+    ...initialState,
+    ...buildActions(set, get),
+  });
+
+  const store = shouldPersist
+    ? createVanillaStore<StoreState>()(
+        subscribeWithSelector(
+          persist(initializer, {
+            name: PERSIST_KEY,
+            partialize: (s) => ({
+              activeProvider: s.activeProvider,
+              anthropicKey: s.anthropicKey,
+              anthropicModel: s.anthropicModel,
+              ollamaUrl: s.ollamaUrl,
+              ollamaModel: s.ollamaModel,
+            }),
+          }),
+        ),
+      )
+    : createVanillaStore<StoreState>()(subscribeWithSelector(initializer));
+
+  const initPromise = runFirstRunInit(store, executor);
+  store.setState({ initPromise });
+
+  return store;
+}
+
+async function runFirstRunInit(store: StoreApi<StoreState>, executor: Executor): Promise<void> {
+  if (store.getState().lastGoodGrid) return;
+
+  const { promptSlug, modelSlug } = DEFAULT_DEMO;
+  const script = CACHED_DEMOS[promptSlug]?.[modelSlug];
+  const text = getPromptText(promptSlug);
+  if (!script || !text) return;
+
+  const result: ExecuteResult = await executor.execute(script);
+  if (!result.ok) return;
+
+  store.setState({
+    lastGoodGrid: result.grid,
+    currentScript: script,
+    currentPrompt: text,
+    currentSource: "cached",
+    currentModelSlug: modelSlug,
+    messages: [
+      {
+        id: nextMessageId(),
+        role: "assistant" as const,
+        text: "",
+        label: CACHED_LABEL,
+        source: "cached" as ProviderId,
+        modelSlug,
+        script,
+      },
+    ],
+  });
+}
