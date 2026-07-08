@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "./ChatPanel";
+import { CodePanel } from "./CodePanel";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { TopStrip } from "./TopStrip";
 import { Viewport } from "./Viewport";
@@ -37,6 +38,7 @@ export function App() {
         onClose={() => setSettingsOpen(false)}
         returnFocusRef={gearRef}
       />
+      <CodePanel />
     </div>
   );
 }
