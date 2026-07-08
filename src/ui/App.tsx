@@ -1,26 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
-import { ViewportCanvas } from "../renderer";
-import { SandboxExecutor } from "../sandbox";
-import { type GridReadback, createGrid } from "../voxel";
+import { useEffect, useState } from "react";
+import { ChatPanel } from "./ChatPanel";
+import { TopStrip } from "./TopStrip";
+import { Viewport } from "./Viewport";
 
-const TRACER_SCRIPT = 'sphere(32, 24, 32, 8, "red")';
-
-const EMPTY_GRID: GridReadback = createGrid().readback();
+const MIN_WIDTH = 1024;
 
 export function App() {
-  const executor = useMemo(() => new SandboxExecutor(), []);
-  const [grid, setGrid] = useState<GridReadback>(EMPTY_GRID);
+  const [tooNarrow, setTooNarrow] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : window.innerWidth < MIN_WIDTH,
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    executor.execute(TRACER_SCRIPT).then((result) => {
-      if (cancelled) return;
-      if (result.ok) setGrid(result.grid);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [executor]);
+    const onResize = () => setTooNarrow(window.innerWidth < MIN_WIDTH);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
-  return <ViewportCanvas grid={grid} />;
+  if (tooNarrow) {
+    return (
+      <div className="too-narrow">
+        <p>daedalus is built for a bigger screen</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <TopStrip />
+      <Viewport />
+      <ChatPanel />
+    </div>
+  );
 }

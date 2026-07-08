@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "prompts": [
+    {
+      "slug": "red-sphere",
+      "text": "a red sphere",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    },
+    {
+      "slug": "green-tree",
+      "text": "a green tree",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    },
+    {
+      "slug": "castle-with-four-towers",
+      "text": "a small castle with four towers",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    },
+    {
+      "slug": "spiral-staircase",
+      "text": "a spiral staircase",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    },
+    {
+      "slug": "small-robot",
+      "text": "a small robot",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    },
+    {
+      "slug": "mushroom",
+      "text": "a mushroom",
+      "models": ["claude-sonnet-4-6", "qwen3-coder-30b"]
+    }
+  ]
+}
