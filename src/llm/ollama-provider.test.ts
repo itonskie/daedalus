@@ -114,4 +114,60 @@ describe("OllamaProvider", () => {
     const body = JSON.parse(init.body as string);
     expect(body.model).toBe("qwen2.5-coder:14b");
   });
+
+  test("does not enable streaming (no stream:true in body)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse('place(0,0,0,"red")'));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const p = new OllamaProvider({ baseUrl: "http://localhost:11434", model: "qwen3-coder:30b" });
+    await p.generateVoxelScript("a red dot");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.stream).toBe(false);
+  });
+
+  test("forwards the AbortSignal into fetch and rejects with kind: cancelled", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The user aborted a request.", "AbortError"));
+        });
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const p = new OllamaProvider({ baseUrl: "http://localhost:11434", model: "qwen3-coder:30b" });
+    const abort = new AbortController();
+    const promise = p.generateVoxelScript("a sphere", abort.signal);
+    await Promise.resolve();
+    abort.abort();
+    await expect(promise).rejects.toMatchObject({
+      providerId: "ollama",
+      kind: "cancelled",
+    });
+  });
+
+  test("self-aborts after the client timeout and rejects with kind: client-timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The user aborted a request.", "AbortError"));
+          });
+        });
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const p = new OllamaProvider({ baseUrl: "http://localhost:11434", model: "qwen3-coder:30b" });
+      const promise = p.generateVoxelScript("a sphere");
+      const caught = promise.catch((e) => e);
+      await vi.advanceTimersByTimeAsync(120_000);
+      const err = await caught;
+      expect(err).toMatchObject({ providerId: "ollama", kind: "client-timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

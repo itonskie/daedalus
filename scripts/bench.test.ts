@@ -214,6 +214,41 @@ describe("runBench", () => {
     }
   });
 
+  test("results.md includes elapsed seconds for successful cells", async () => {
+    const providerScript = 'sphere(32,24,32,8,"red")';
+    let calls = 0;
+    const slow: LLMProvider = {
+      id: "anthropic",
+      async generateVoxelScript() {
+        calls += 1;
+        // Deterministic elapsed via now() clock. We'll drive it below.
+        return providerScript;
+      },
+    };
+    // Fixed clock that advances by 3 seconds between successive calls.
+    let ticks = 0;
+    const now = () => new Date(1_700_000_000_000 + ticks++ * 3000);
+
+    const result = await runBench({
+      demosDir,
+      providers: [
+        {
+          provider: slow,
+          displayModel: "claude-sonnet-4-6",
+          modelSlug: sanitizeModelSlug("claude-sonnet-4-6"),
+        },
+      ],
+      now,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(calls).toBeGreaterThan(0);
+
+    const results = await readFile(join(demosDir, "results.md"), "utf8");
+    // Every ok row includes an elapsed number followed by 's'.
+    expect(results).toMatch(/ok · \d+ line/);
+    expect(results).toMatch(/\d+s/);
+  });
+
   test("results.md header includes 'Last run: YYYY-MM-DD' (UTC ok)", async () => {
     const fixed = new Date("2026-07-08T15:04:05Z");
     const result = await runBench({

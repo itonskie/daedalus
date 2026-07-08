@@ -112,6 +112,8 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
     initPromise: null,
   };
 
+  let inFlightAbort: AbortController | null = null;
+
   const buildActions = (
     set: StoreApi<StoreState>["setState"],
     get: StoreApi<StoreState>["getState"],
@@ -170,6 +172,8 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       sourceLabelName: "Anthropic" | "Ollama",
     ): Promise<void> => {
       const source = provider.id;
+      const abort = new AbortController();
+      inFlightAbort = abort;
       set({
         isGenerating: true,
         providerNotConfiguredHint: false,
@@ -182,8 +186,9 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
 
       let script: string;
       try {
-        script = await provider.generateVoxelScript(prompt);
+        script = await provider.generateVoxelScript(prompt, abort.signal);
       } catch (thrown) {
+        if (inFlightAbort === abort) inFlightAbort = null;
         const err = thrown instanceof LLMProviderError ? thrown : null;
         const copy = err ? errorToCopy(err, { ollamaUrl: get().ollamaUrl }) : "Generation failed.";
         set({
@@ -207,6 +212,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
         return;
       }
 
+      if (inFlightAbort === abort) inFlightAbort = null;
       const result = await executor.execute(script);
       if (result.ok) {
         set({
@@ -250,6 +256,13 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
           ],
         });
       }
+    };
+
+    const cancelGeneration = () => {
+      const abort = inFlightAbort;
+      if (!abort) return;
+      inFlightAbort = null;
+      abort.abort();
     };
 
     const submitPrompt = async (prompt: string): Promise<void> => {
@@ -362,6 +375,7 @@ export function createDaedalusStore(options: CreateStoreOptions = {}): StoreApi<
       setOllamaUrl,
       setOllamaModel,
       clearProviderNotConfiguredHint,
+      cancelGeneration,
       openCodePanel,
       closeCodePanel,
       setView,

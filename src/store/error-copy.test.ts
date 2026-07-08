@@ -35,6 +35,26 @@ describe("errorToCopy — LLMProviderError rows", () => {
     const err = new LLMProviderError("ollama", "shape");
     expect(errorToCopy(err)).toBe("The model returned something that isn't code.");
   });
+
+  test("cancelled (Anthropic)", () => {
+    const err = new LLMProviderError("anthropic", "cancelled");
+    expect(errorToCopy(err)).toBe("Generation cancelled.");
+  });
+
+  test("cancelled (Ollama)", () => {
+    const err = new LLMProviderError("ollama", "cancelled");
+    expect(errorToCopy(err)).toBe("Generation cancelled.");
+  });
+
+  test("client-timeout (Anthropic)", () => {
+    const err = new LLMProviderError("anthropic", "client-timeout");
+    expect(errorToCopy(err)).toBe("The model took too long — try again or use a smaller model.");
+  });
+
+  test("client-timeout (Ollama)", () => {
+    const err = new LLMProviderError("ollama", "client-timeout");
+    expect(errorToCopy(err)).toBe("The model took too long — try again or use a smaller model.");
+  });
 });
 
 describe("errorToCopy — ExecuteError rows", () => {

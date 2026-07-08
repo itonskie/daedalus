@@ -77,6 +77,7 @@ export interface StoreState {
   setOllamaUrl: (v: string) => void;
   setOllamaModel: (v: string) => void;
   clearProviderNotConfiguredHint: () => void;
+  cancelGeneration: () => void;
   openCodePanel: (
     source: ProviderId,
     script: string,

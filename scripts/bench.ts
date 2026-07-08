@@ -44,6 +44,7 @@ interface CellResult {
   ok: boolean;
   lineCount?: number;
   errorKind?: string;
+  elapsedMs?: number;
 }
 
 export function sanitizeModelSlug(model: string): string {
@@ -84,7 +85,10 @@ export async function runBench(options: BenchOptions = {}): Promise<BenchResult>
       results.get(p.slug)?.set(entry.modelSlug, cell);
       const label = `${p.slug}/${entry.modelSlug}`;
       if (cell.ok) {
-        stdout.push(`${label}: ok · ${cell.lineCount} line${cell.lineCount === 1 ? "" : "s"}`);
+        const secs = formatElapsedSeconds(cell.elapsedMs ?? 0);
+        stdout.push(
+          `${label}: ok · ${cell.lineCount} line${cell.lineCount === 1 ? "" : "s"} · ${secs}s`,
+        );
       } else {
         stdout.push(`${label}: failed · ${cell.errorKind}`);
       }
@@ -108,16 +112,18 @@ async function benchOne(
   demosDir: string,
 ): Promise<CellResult> {
   let script: string;
+  const startedAt = Date.now();
   try {
     script = await entry.provider.generateVoxelScript(prompt.text);
   } catch (e) {
     const kind = e instanceof LLMProviderError ? e.kind : "provider";
-    return { ok: false, errorKind: kind };
+    return { ok: false, errorKind: kind, elapsedMs: Date.now() - startedAt };
   }
+  const elapsedMs = Date.now() - startedAt;
 
   const exec = await executor.execute(script);
   if (!exec.ok) {
-    return { ok: false, errorKind: exec.error.kind };
+    return { ok: false, errorKind: exec.error.kind, elapsedMs };
   }
 
   const dir = join(demosDir, prompt.slug);
@@ -125,7 +131,11 @@ async function benchOne(
   const contents = script.endsWith("\n") ? script : `${script}\n`;
   await writeFile(join(dir, `${entry.modelSlug}.js`), contents);
   const lineCount = script.trimEnd().split("\n").length;
-  return { ok: true, lineCount };
+  return { ok: true, lineCount, elapsedMs };
+}
+
+function formatElapsedSeconds(ms: number): string {
+  return Math.max(0, Math.round(ms / 1000)).toString();
 }
 
 async function writeManifest(demosDir: string): Promise<void> {
@@ -169,8 +179,11 @@ async function writeResultsMarkdown(
     const cells = providers.map((entry) => {
       const cell = results.get(p.slug)?.get(entry.modelSlug);
       if (!cell) return "—";
-      if (cell.ok) return `ok · ${cell.lineCount} line${cell.lineCount === 1 ? "" : "s"}`;
-      return `failed · ${cell.errorKind}`;
+      const secs = formatElapsedSeconds(cell.elapsedMs ?? 0);
+      if (cell.ok) {
+        return `ok · ${cell.lineCount} line${cell.lineCount === 1 ? "" : "s"} · ${secs}s`;
+      }
+      return `failed · ${cell.errorKind} · ${secs}s`;
     });
     rows.push(`| ${p.text} | ${cells.join(" | ")} |`);
   }
